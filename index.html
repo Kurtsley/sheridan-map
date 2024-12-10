@@ -1,0 +1,233 @@
+<!-- Kurtsley 2024 -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sheridan County Map</title>
+    <link rel="manifest" href="static/manifest.json" />
+    <link href='css/style.css' rel="stylesheet" />
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
+
+    <!-- Load the `mapbox-gl-geocoder` plugin. -->
+    <script
+        src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.3/mapbox-gl-geocoder.min.js"></script>
+    <link rel="stylesheet"
+        href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.3/mapbox-gl-geocoder.css"
+        type="text/css">
+</head>
+
+<body>
+    <div id="map-container">
+        <div id="map"></div>
+        <a id="buyMeACoffeeBtn" href="https://www.buymeacoffee.com/Kurtsley" target="_blank">
+            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png" alt="Buy Me A Coffee"
+                style="height: 40px !important;width: auto !important;"></a>
+        <script>
+            const accessToken = 'pk.eyJ1Ijoia3VydHNsZXkiLCJhIjoiY200aXp1NXF2MDhrdzJqcTBvdG9iZXZxYSJ9.iOy7tYqr6EVQaSijXYt2KQ';
+
+            const map = new mapboxgl.Map({
+                accessToken: accessToken,
+                container: 'map',
+                style: 'mapbox://styles/mapbox/satellite-streets-v12',
+                center: [-104.55584869444941, 48.779424966532964],  // Coordinates for the center
+                zoom: 10,
+                customAttribution: "Developed by Kurtsley",
+            });
+
+            // Move donate button to see attribution
+            const moreinfobtn = document.querySelector('.mapboxgl-ctrl-attrib-button');
+            const donatebtn = document.getElementById('buyMeACoffeeBtn');
+
+            moreinfobtn.addEventListener('click', function () {
+                moreinfobtn.classList.toggle('expanded');
+                const expanded = moreinfobtn.classList.contains('expanded');
+                if (expanded) {
+                    donatebtn.style.transform = 'translate(-50%, -50px)';
+                } else {
+                    donatebtn.style.transform = 'translate(-50%, 0px)';
+                }
+            });
+
+            let geojsonData = null;
+            fetch('data/sheridanfull.geojson')
+                .then(response => response.json())
+                .then(data => {
+                    geojsonData = data;
+                })
+                .catch(error => console.error('Error loading geojson data', error));
+
+            function localGeocoder(query) {
+                const matchingFeatures = [];
+
+                if (!geojsonData) return [];
+
+                const features = geojsonData.features;
+
+                for (const feature of features) {
+                    if (
+                        feature.properties.ADD &&
+                        feature.properties.ADD.toLowerCase().includes(query.toLowerCase())
+                    ) {
+                        feature['place_name'] = feature.properties.ADD;
+                        feature['center'] = feature.geometry.coordinates;
+                        matchingFeatures.push(feature);
+                    }
+                }
+                return matchingFeatures;
+            }
+
+            function navigateURL(feature) {
+                let url = "https://www.google.com/maps/search/?api=1&query=" +
+                    feature.properties.Lat +
+                    "," +
+                    feature.properties.Long;
+
+                return url;
+            }
+
+            map.on('load', function () {
+                // Zoom control
+                map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+                map.addSource('points', {
+                    type: 'geojson',
+                    data: 'data/sheridanfull.geojson',
+                    cluster: true,
+                    clusterMaxZoom: 14,
+                    clusterRadius: 50,
+                });
+
+                map.addLayer({
+                    id: 'clusters',
+                    type: 'circle',
+                    source: 'points',
+                    filter: ['has', 'point_count'], // Only clusters
+                    paint: {
+                        'circle-color': [
+                            'step',
+                            ['get', 'point_count'],
+                            '#51bbd6', // Cluster color for low counts
+                            100, '#f28cb1', // Cluster color for medium counts
+                            750, '#f1f075' // Cluster color for high counts
+                        ],
+                        'circle-radius': [
+                            'step',
+                            ['get', 'point_count'],
+                            20, // Radius for low counts
+                            100, 30, // Radius for medium counts
+                            750, 40 // Radius for high counts
+                        ],
+                        'circle-opacity': 0.7,
+                    }
+                });
+
+                map.addLayer({
+                    id: 'cluster-count',
+                    type: 'symbol',
+                    source: 'points',
+                    filter: ['has', 'point_count'], // Only clusters
+                    layout: {
+                        'text-field': '{point_count_abbreviated}',
+                        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                        'text-size': 12
+                    }
+                });
+
+                map.addLayer({
+                    id: 'unclustered-point',
+                    type: 'circle',
+                    source: 'points',
+                    filter: ['!', ['has', 'point_count']], // Only non-clusters
+                    paint: {
+                        'circle-radius': [
+                            'interpolate',
+                            ['linear'],
+                            ['zoom'],
+                            0, 4,
+                            10, 8,
+                            20, 12,
+                        ],
+                        'circle-color': '#F0FD05',
+                        'circle-opacity': 0.7,
+                    }
+                });
+
+                map.addLayer({
+                    id: 'labels',
+                    type: 'symbol',
+                    source: 'points',
+                    layout: {
+                        'text-field': ['get', 'ADDRESS'],
+                        'text-size': 14,
+                        'text-offset': [2, -2],
+                        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                        'visibility': 'none',
+                    },
+                    paint: {
+                        'text-color': '#FFFFFF'
+                    },
+                });
+
+                const geocoder = new MapboxGeocoder({
+                    accessToken: accessToken,
+                    mapboxgl: mapboxgl,
+                    localGeocoderOnly: true,
+                    localGeocoder: localGeocoder,
+                    placeholder: "Enter address...",
+                    zoom: 14,
+                    marker: false,
+                });
+
+                map.addControl(geocoder, 'top-left');
+
+                geocoder.on('result', (e) => {
+                    map.flyTo({ center: e.result.center, zoom: 17 });
+
+                    // Clear the search box
+                    const inputBox = document.querySelector('.mapboxgl-ctrl-geocoder input');
+                    if (inputBox) {
+                        inputBox.value = ''; // Clear the input
+                        inputBox.blur();     // Remove focus (hides keyboard on mobile)
+                    }
+                });
+
+                map.on('zoom', function () {
+                    const zoomLevel = map.getZoom();
+
+                    if (zoomLevel >= 14) {
+                        map.setLayoutProperty('labels', 'visibility', 'visible');
+                    } else {
+                        map.setLayoutProperty('labels', 'visibility', 'none');
+                    }
+                });
+
+                map.on('mouseenter', 'unclustered-point', () => {
+                    map.getCanvas().style.cursor = 'pointer';
+                });
+
+                map.on('mouseleave', 'unclustered-point', () => {
+                    map.getCanvas().style.cursor = '';
+                });
+
+                map.on('click', 'unclustered-point', (e) => {
+                    const feature = e.features[0];
+                    window.open(navigateURL(feature), '_blank');
+                });
+            });
+
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/service-worker.js');
+                });
+            }
+
+        </script>
+    </div>
+
+</body>
+
+</html>

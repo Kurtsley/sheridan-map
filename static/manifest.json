@@ -1,0 +1,20 @@
+{
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "Sheridan County Map",
+  "orientation": "any",
+  "scope": "/sheridan-county-map",
+  "short_name": "Sheridan County Map",
+  "start_url": "/sheridan-county-map/",
+  "theme_color": "#ffffff",
+  "id": "williams-county-map-pwa",
+  "description": "Searchable map of Sheridan County MT",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "map.png",
+      "sizes": "512x512"
+    }
+  ]
+}
